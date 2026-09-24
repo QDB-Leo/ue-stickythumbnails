@@ -18,8 +18,12 @@ public class UassetThumbnailLock : ModuleRules
 			"Slate",
 			"SlateCore",
 			"UnrealEd",
+			"EditorSubsystem",
+			"ToolMenus",
 			"ContentBrowser",
 			"AssetTools",
+			"AssetRegistry",
+			"LevelSequence",
 		});
 	}
 }
