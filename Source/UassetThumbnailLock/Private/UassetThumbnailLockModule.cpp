@@ -190,14 +190,6 @@ void FUassetThumbnailLockModule::SetThumbnailLocked(UObject* Object, bool bLocke
 	UE_LOG(LogUassetThumbnailLock, Log, TEXT("%s thumbnail of %s"), bLocked ? TEXT("Locked") : TEXT("Unlocked"), *Object->GetPathName());
 }
 
-void FUassetThumbnailLockModule::SetThumbnailLocked(const TArray<FAssetData>& Assets, bool bLocked)
-{
-	for (const FAssetData& AssetData : Assets)
-	{
-		SetThumbnailLocked(AssetData.GetAsset(), bLocked);
-	}
-}
-
 bool FUassetThumbnailLockModule::CaptureAndLockThumbnails(const TArray<UObject*>& Objects)
 {
 	FObjectThumbnail CapturedThumbnail;
@@ -245,20 +237,10 @@ void FUassetThumbnailLockModule::RegisterMenus()
 
 	// Level Sequence actions section, at the top of the context menu.
 	// Asset context menus are hierarchical, so this also covers ULevelSequence subclasses.
-	{
-		UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("ContentBrowser.AssetContextMenu.LevelSequence");
-		FToolMenuSection& Section = Menu->FindOrAddSection("GetAssetActions");
-		Section.AddDynamicEntry("UassetThumbnailLock", FNewToolMenuSectionDelegate::CreateRaw(this, &FUassetThumbnailLockModule::PopulateAssetContextMenu));
-	}
-
-	// "Asset Actions" sub-menu shared by every asset type, next to Capture / Clear Thumbnail.
-	// PopulateAssetActionsSubMenu only adds entries when Level Sequences are selected.
-	{
-		UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("ContentBrowser.AssetContextMenu.AssetActionsSubMenu");
-		FToolMenuSection& Section = Menu->FindOrAddSection("AssetActionsSection");
-		FToolMenuEntry& Entry = Section.AddDynamicEntry("UassetThumbnailLock", FNewToolMenuSectionDelegate::CreateRaw(this, &FUassetThumbnailLockModule::PopulateAssetActionsSubMenu));
-		Entry.InsertPosition = FToolMenuInsert("ClearThumbnail", EToolMenuInsertType::After);
-	}
+	// Unlocking is done with Asset Actions > Clear Thumbnail (see ProcessDeferredWork).
+	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("ContentBrowser.AssetContextMenu.LevelSequence");
+	FToolMenuSection& Section = Menu->FindOrAddSection("GetAssetActions");
+	Section.AddDynamicEntry("UassetThumbnailLock", FNewToolMenuSectionDelegate::CreateRaw(this, &FUassetThumbnailLockModule::PopulateAssetContextMenu));
 }
 
 void FUassetThumbnailLockModule::PopulateAssetContextMenu(FToolMenuSection& Section)
@@ -299,45 +281,6 @@ void FUassetThumbnailLockModule::PopulateAssetContextMenu(FToolMenuSection& Sect
 				CaptureAndLockThumbnails(Objects);
 			}),
 			FCanExecuteAction::CreateLambda([]() { return GEditor && GEditor->GetActiveViewport() && GCurrentLevelEditingViewportClient; })));
-}
-
-void FUassetThumbnailLockModule::PopulateAssetActionsSubMenu(FToolMenuSection& Section)
-{
-	const UContentBrowserAssetContextMenuContext* Context = Section.FindContext<UContentBrowserAssetContextMenuContext>();
-	if (!Context)
-	{
-		return;
-	}
-
-	TArray<FAssetData> ToLock;
-	TArray<FAssetData> ToUnlock;
-	for (const FAssetData& AssetData : Context->SelectedAssets)
-	{
-		if (SupportsThumbnailLock(AssetData.GetClass()))
-		{
-			(IsThumbnailLocked(AssetData) ? ToUnlock : ToLock).Add(AssetData);
-		}
-	}
-
-	if (ToLock.Num() > 0)
-	{
-		Section.AddMenuEntry(
-			"LockThumbnail",
-			LOCTEXT("LockThumbnail", "Lock Thumbnail"),
-			LOCTEXT("LockThumbnailTooltip", "Keep the current thumbnail: it will no longer be refreshed when the asset is saved."),
-			FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Lock"),
-			FUIAction(FExecuteAction::CreateLambda([this, ToLock]() { SetThumbnailLocked(ToLock, true); })));
-	}
-
-	if (ToUnlock.Num() > 0)
-	{
-		Section.AddMenuEntry(
-			"UnlockThumbnail",
-			LOCTEXT("UnlockThumbnail", "Unlock Thumbnail"),
-			LOCTEXT("UnlockThumbnailTooltip", "Let the thumbnail be refreshed again when the asset is saved."),
-			FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Unlock"),
-			FUIAction(FExecuteAction::CreateLambda([this, ToUnlock]() { SetThumbnailLocked(ToUnlock, false); })));
-	}
 }
 
 FObjectThumbnail* FUassetThumbnailLockModule::FindLockedThumbnail(UObject* Object)
@@ -469,6 +412,13 @@ void FUassetThumbnailLockModule::HandleObjectPreSave(UObject* Object, FObjectPre
 		return;
 	}
 
+	// Cleared thumbnail (Clear Thumbnail): the asset gets unlocked, keep it cleared
+	const FObjectThumbnail* CachedThumbnail = ThumbnailTools::FindCachedThumbnail(Object->GetFullName());
+	if (CachedThumbnail && CachedThumbnail->IsEmpty())
+	{
+		return;
+	}
+
 	// Runs after the editor / Sequencer have generated the new thumbnail: put the locked one back before it gets written
 	if (FObjectThumbnail* LockedThumbnail = FindLockedThumbnail(Object))
 	{
@@ -496,7 +446,7 @@ void FUassetThumbnailLockModule::HandlePackageSaved(const FString& PackageFilena
 
 void FUassetThumbnailLockModule::HandleObjectPropertyChanged(UObject* Object, FPropertyChangedEvent& PropertyChangedEvent)
 {
-	// Capture Thumbnail caches the new image then calls PostEditChange on the asset: check for it next tick
+	// Capture / Clear Thumbnail cache the new (or empty) image then call PostEditChange on the asset: check for it next tick
 	if (Object && Object->IsAsset() && SupportsThumbnailLock(Object->GetClass()))
 	{
 		PendingCaptureChecks.Add(Object);
@@ -565,7 +515,18 @@ bool FUassetThumbnailLockModule::ProcessDeferredWork(float DeltaTime)
 	for (const TWeakObjectPtr<UObject>& WeakObject : CaptureChecks)
 	{
 		UObject* Object = WeakObject.Get();
-		if (Object && IsThumbnailLocked(Object) && AdoptCachedThumbnail(Object))
+		if (!Object || !IsThumbnailLocked(Object))
+		{
+			continue;
+		}
+
+		const FObjectThumbnail* CachedThumbnail = ThumbnailTools::FindCachedThumbnail(Object->GetFullName());
+		if (CachedThumbnail && CachedThumbnail->IsEmpty())
+		{
+			// Clear Thumbnail unlocks the asset
+			SetThumbnailLocked(Object, false);
+		}
+		else if (AdoptCachedThumbnail(Object))
 		{
 			SetLockUserData(Object, true);
 			UE_LOG(LogUassetThumbnailLock, Log, TEXT("Captured thumbnail kept as the locked thumbnail of %s"), *Object->GetPathName());

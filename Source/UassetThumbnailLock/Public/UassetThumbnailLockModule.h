@@ -19,7 +19,7 @@ struct FToolMenuSection;
  * The lock is stored as package metadata on the asset itself (so it is shared through source control)
  * and exposed as an asset registry tag so the Content Browser can read it without loading the asset.
  * While an asset is locked, the thumbnail written on save is replaced by the one it had when it was locked,
- * or by the last one captured manually (Capture Thumbnail).
+ * or by the last one captured manually (Capture Thumbnail). Clear Thumbnail unlocks the asset.
  */
 class FUassetThumbnailLockModule : public IModuleInterface
 {
@@ -44,8 +44,6 @@ public:
 private:
 	void RegisterMenus();
 	void PopulateAssetContextMenu(FToolMenuSection& Section);
-	void PopulateAssetActionsSubMenu(FToolMenuSection& Section);
-	void SetThumbnailLocked(const TArray<FAssetData>& Assets, bool bLocked);
 
 	void HandleObjectPreSave(UObject* Object, FObjectPreSaveContext SaveContext);
 	void HandlePackageSaved(const FString& PackageFilename, UPackage* Package, FObjectPostSaveContext SaveContext);
