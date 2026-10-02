@@ -122,10 +122,12 @@ void FUassetThumbnailLockModule::RegisterMenus()
 {
 	FToolMenuOwnerScoped OwnerScoped(this);
 
-	// Asset context menus are hierarchical, so this also covers ULevelSequence subclasses
-	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("ContentBrowser.AssetContextMenu.LevelSequence");
-	FToolMenuSection& Section = Menu->FindOrAddSection("GetAssetActions");
-	Section.AddDynamicEntry("UassetThumbnailLock", FNewToolMenuSectionDelegate::CreateRaw(this, &FUassetThumbnailLockModule::PopulateAssetContextMenu));
+	// "Asset Actions" sub-menu shared by every asset type, next to Capture / Clear Thumbnail.
+	// PopulateAssetContextMenu only adds entries when Level Sequences are selected.
+	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("ContentBrowser.AssetContextMenu.AssetActionsSubMenu");
+	FToolMenuSection& Section = Menu->FindOrAddSection("AssetActionsSection");
+	FToolMenuEntry& Entry = Section.AddDynamicEntry("UassetThumbnailLock", FNewToolMenuSectionDelegate::CreateRaw(this, &FUassetThumbnailLockModule::PopulateAssetContextMenu));
+	Entry.InsertPosition = FToolMenuInsert("ClearThumbnail", EToolMenuInsertType::After);
 }
 
 void FUassetThumbnailLockModule::PopulateAssetContextMenu(FToolMenuSection& Section)

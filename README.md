@@ -13,12 +13,12 @@ Unreal Engine editor plugin to lock asset thumbnails so they are not regenerated
 
 ## Usage
 
-Right-click a **Level Sequence** (Cinematic Assemblies included) in the Content Browser:
+Right-click a **Level Sequence** (Cinematic Assemblies included) in the Content Browser, then **Asset Actions** (next to *Capture Thumbnail* / *Clear Thumbnail*):
 
 - **Lock Thumbnail**: keeps the current thumbnail. Saving the asset no longer refreshes it.
 - **Unlock Thumbnail**: the thumbnail is refreshed on save again.
 
-Multi-selection is supported. To change a locked thumbnail: unlock, save (or capture a new thumbnail), then lock again.
+Multi-selection is supported. To change a locked thumbnail: unlock, *Capture Thumbnail*, then lock again and save. *Capture Thumbnail* on a locked asset is reverted on save.
 
 ### How it works
 
