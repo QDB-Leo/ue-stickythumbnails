@@ -13,18 +13,22 @@ Unreal Engine editor plugin to lock asset thumbnails so they are not regenerated
 
 ## Usage
 
-Right-click a **Level Sequence** (Cinematic Assemblies included) in the Content Browser, then **Asset Actions** (next to *Capture Thumbnail* / *Clear Thumbnail*):
+Right-click a **Level Sequence** (Cinematic Assemblies included) in the Content Browser:
 
-- **Lock Thumbnail**: keeps the current thumbnail. Saving the asset no longer refreshes it.
-- **Unlock Thumbnail**: the thumbnail is refreshed on save again.
+- **Capture & Lock Thumbnail** (Level Sequence actions, top of the menu): captures the active level viewport as the thumbnail and locks it.
+- **Asset Actions > Lock Thumbnail**: keeps the current thumbnail. Saving the asset no longer refreshes it.
+- **Asset Actions > Unlock Thumbnail**: the thumbnail is refreshed on save again.
 
-Multi-selection is supported. To change a locked thumbnail: unlock, *Capture Thumbnail*, then lock again and save. *Capture Thumbnail* on a locked asset is reverted on save.
+Multi-selection is supported. *Asset Actions > Capture Thumbnail* still works on a locked asset: the captured image becomes the locked thumbnail.
+Duplicating a locked asset gives a locked duplicate with the same thumbnail.
 
 ### How it works
 
 - The lock is stored as package metadata (`ThumbnailLocked=true`) on the asset, so it is shared through source control. Toggling it marks the asset dirty: save it to persist the lock.
 - The tag is also exposed to the asset registry, so the menu knows the state without loading the asset.
-- When a locked asset is saved, the thumbnail being written is replaced by the locked one (captured at lock time, or read back from the saved `.uasset`).
+- When a locked asset is saved, the thumbnail being written is replaced by the locked one (captured at lock time or manually, or read back from the saved `.uasset`).
+- A thumbnail change outside of a save (manual capture) is adopted as the new locked thumbnail.
+- Locked assets also carry an editor-only asset user data marker (`UThumbnailLockUserData`). It is copied on duplication, which is how a duplicate finds its source and inherits the lock.
 
 ## Layout
 
