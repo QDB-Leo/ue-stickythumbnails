@@ -1,4 +1,4 @@
-#include "UassetThumbnailLockModule.h"
+#include "StickyThumbnailsModule.h"
 
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -13,20 +13,20 @@
 #include "ObjectTools.h"
 #include "Styling/AppStyle.h"
 #include "Subsystems/EditorAssetSubsystem.h"
-#include "ThumbnailLockUserData.h"
+#include "StickyThumbnailUserData.h"
 #include "ToolMenus.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/Package.h"
 #include "UObject/UObjectGlobals.h"
 #include "UnrealClient.h"
 
-#define LOCTEXT_NAMESPACE "FUassetThumbnailLockModule"
+#define LOCTEXT_NAMESPACE "FStickyThumbnailsModule"
 
-DEFINE_LOG_CATEGORY_STATIC(LogUassetThumbnailLock, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogStickyThumbnails, Log, All);
 
-const FName FUassetThumbnailLockModule::LockedTag(TEXT("ThumbnailLocked"));
+const FName FStickyThumbnailsModule::LockedTag(TEXT("ThumbnailLocked"));
 
-namespace UassetThumbnailLock
+namespace StickyThumbnails
 {
 	static const TCHAR* LockedValue = TEXT("true");
 
@@ -98,23 +98,23 @@ namespace UassetThumbnailLock
 	}
 }
 
-void FUassetThumbnailLockModule::StartupModule()
+void FStickyThumbnailsModule::StartupModule()
 {
 	// Expose the metadata as an asset registry tag so the lock state is known without loading the asset
 	UObject::GetMetaDataTagsForAssetRegistry().Add(LockedTag);
 
-	PreSaveHandle = FCoreUObjectDelegates::OnObjectPreSave.AddRaw(this, &FUassetThumbnailLockModule::HandleObjectPreSave);
-	PackageSavedHandle = UPackage::PackageSavedWithContextEvent.AddRaw(this, &FUassetThumbnailLockModule::HandlePackageSaved);
-	PropertyChangedHandle = FCoreUObjectDelegates::OnObjectPropertyChanged.AddRaw(this, &FUassetThumbnailLockModule::HandleObjectPropertyChanged);
+	PreSaveHandle = FCoreUObjectDelegates::OnObjectPreSave.AddRaw(this, &FStickyThumbnailsModule::HandleObjectPreSave);
+	PackageSavedHandle = UPackage::PackageSavedWithContextEvent.AddRaw(this, &FStickyThumbnailsModule::HandlePackageSaved);
+	PropertyChangedHandle = FCoreUObjectDelegates::OnObjectPropertyChanged.AddRaw(this, &FStickyThumbnailsModule::HandleObjectPropertyChanged);
 
 	IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
-	AssetCreatedHandle = AssetRegistry.OnInMemoryAssetCreated().AddRaw(this, &FUassetThumbnailLockModule::HandleInMemoryAssetCreated);
-	AssetRenamedHandle = AssetRegistry.OnAssetRenamed().AddRaw(this, &FUassetThumbnailLockModule::HandleAssetRenamed);
+	AssetCreatedHandle = AssetRegistry.OnInMemoryAssetCreated().AddRaw(this, &FStickyThumbnailsModule::HandleInMemoryAssetCreated);
+	AssetRenamedHandle = AssetRegistry.OnAssetRenamed().AddRaw(this, &FStickyThumbnailsModule::HandleAssetRenamed);
 
-	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FUassetThumbnailLockModule::RegisterMenus));
+	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FStickyThumbnailsModule::RegisterMenus));
 }
 
-void FUassetThumbnailLockModule::ShutdownModule()
+void FStickyThumbnailsModule::ShutdownModule()
 {
 	UToolMenus::UnRegisterStartupCallback(this);
 	UToolMenus::UnregisterOwner(this);
@@ -140,18 +140,18 @@ void FUassetThumbnailLockModule::ShutdownModule()
 	LockedThumbnails.Empty();
 }
 
-bool FUassetThumbnailLockModule::SupportsThumbnailLock(const UClass* Class)
+bool FStickyThumbnailsModule::SupportsThumbnailLock(const UClass* Class)
 {
 	return Class && Class->IsChildOf(ULevelSequence::StaticClass());
 }
 
-bool FUassetThumbnailLockModule::IsThumbnailLocked(UObject* Object)
+bool FStickyThumbnailsModule::IsThumbnailLocked(UObject* Object)
 {
-	UEditorAssetSubsystem* AssetSubsystem = UassetThumbnailLock::GetAssetSubsystem();
-	return Object && AssetSubsystem && AssetSubsystem->GetMetadataTag(Object, LockedTag) == UassetThumbnailLock::LockedValue;
+	UEditorAssetSubsystem* AssetSubsystem = StickyThumbnails::GetAssetSubsystem();
+	return Object && AssetSubsystem && AssetSubsystem->GetMetadataTag(Object, LockedTag) == StickyThumbnails::LockedValue;
 }
 
-bool FUassetThumbnailLockModule::IsThumbnailLocked(const FAssetData& AssetData)
+bool FStickyThumbnailsModule::IsThumbnailLocked(const FAssetData& AssetData)
 {
 	// The registry tag is only refreshed on save, so prefer the in-memory metadata when the asset is loaded
 	if (UObject* LoadedAsset = AssetData.FastGetAsset(false))
@@ -160,12 +160,12 @@ bool FUassetThumbnailLockModule::IsThumbnailLocked(const FAssetData& AssetData)
 	}
 
 	FString Value;
-	return AssetData.GetTagValue(LockedTag, Value) && Value == UassetThumbnailLock::LockedValue;
+	return AssetData.GetTagValue(LockedTag, Value) && Value == StickyThumbnails::LockedValue;
 }
 
-void FUassetThumbnailLockModule::SetThumbnailLocked(UObject* Object, bool bLocked)
+void FStickyThumbnailsModule::SetThumbnailLocked(UObject* Object, bool bLocked)
 {
-	UEditorAssetSubsystem* AssetSubsystem = UassetThumbnailLock::GetAssetSubsystem();
+	UEditorAssetSubsystem* AssetSubsystem = StickyThumbnails::GetAssetSubsystem();
 	if (!Object || !AssetSubsystem || !SupportsThumbnailLock(Object->GetClass()) || IsThumbnailLocked(Object) == bLocked)
 	{
 		return;
@@ -173,7 +173,7 @@ void FUassetThumbnailLockModule::SetThumbnailLocked(UObject* Object, bool bLocke
 
 	if (bLocked)
 	{
-		AssetSubsystem->SetMetadataTag(Object, LockedTag, UassetThumbnailLock::LockedValue);
+		AssetSubsystem->SetMetadataTag(Object, LockedTag, StickyThumbnails::LockedValue);
 
 		// Keep the thumbnail currently in memory; if there is none, the one on disk is used at save time
 		AdoptCachedThumbnail(Object);
@@ -187,15 +187,15 @@ void FUassetThumbnailLockModule::SetThumbnailLocked(UObject* Object, bool bLocke
 	SetLockUserData(Object, bLocked);
 	Object->MarkPackageDirty();
 
-	UE_LOG(LogUassetThumbnailLock, Log, TEXT("%s thumbnail of %s"), bLocked ? TEXT("Locked") : TEXT("Unlocked"), *Object->GetPathName());
+	UE_LOG(LogStickyThumbnails, Log, TEXT("%s thumbnail of %s"), bLocked ? TEXT("Locked") : TEXT("Unlocked"), *Object->GetPathName());
 }
 
-bool FUassetThumbnailLockModule::CaptureAndLockThumbnails(const TArray<UObject*>& Objects)
+bool FStickyThumbnailsModule::CaptureAndLockThumbnails(const TArray<UObject*>& Objects)
 {
 	FObjectThumbnail CapturedThumbnail;
-	if (!UassetThumbnailLock::CaptureActiveViewport(CapturedThumbnail))
+	if (!StickyThumbnails::CaptureActiveViewport(CapturedThumbnail))
 	{
-		UE_LOG(LogUassetThumbnailLock, Warning, TEXT("Could not capture the active level viewport"));
+		UE_LOG(LogStickyThumbnails, Warning, TEXT("Could not capture the active level viewport"));
 		return false;
 	}
 
@@ -231,7 +231,7 @@ bool FUassetThumbnailLockModule::CaptureAndLockThumbnails(const TArray<UObject*>
 	return true;
 }
 
-void FUassetThumbnailLockModule::RegisterMenus()
+void FStickyThumbnailsModule::RegisterMenus()
 {
 	FToolMenuOwnerScoped OwnerScoped(this);
 
@@ -240,10 +240,10 @@ void FUassetThumbnailLockModule::RegisterMenus()
 	// Unlocking is done with Asset Actions > Clear Thumbnail (see ProcessDeferredWork).
 	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("ContentBrowser.AssetContextMenu.LevelSequence");
 	FToolMenuSection& Section = Menu->FindOrAddSection("GetAssetActions");
-	Section.AddDynamicEntry("UassetThumbnailLock", FNewToolMenuSectionDelegate::CreateRaw(this, &FUassetThumbnailLockModule::PopulateAssetContextMenu));
+	Section.AddDynamicEntry("StickyThumbnails", FNewToolMenuSectionDelegate::CreateRaw(this, &FStickyThumbnailsModule::PopulateAssetContextMenu));
 }
 
-void FUassetThumbnailLockModule::PopulateAssetContextMenu(FToolMenuSection& Section)
+void FStickyThumbnailsModule::PopulateAssetContextMenu(FToolMenuSection& Section)
 {
 	const UContentBrowserAssetContextMenuContext* Context = Section.FindContext<UContentBrowserAssetContextMenuContext>();
 	if (!Context)
@@ -283,7 +283,7 @@ void FUassetThumbnailLockModule::PopulateAssetContextMenu(FToolMenuSection& Sect
 			FCanExecuteAction::CreateLambda([]() { return GEditor && GEditor->GetActiveViewport() && GCurrentLevelEditingViewportClient; })));
 }
 
-FObjectThumbnail* FUassetThumbnailLockModule::FindLockedThumbnail(UObject* Object)
+FObjectThumbnail* FStickyThumbnailsModule::FindLockedThumbnail(UObject* Object)
 {
 	const FObjectKey Key(Object);
 	if (FObjectThumbnail* LockedThumbnail = LockedThumbnails.Find(Key))
@@ -314,7 +314,7 @@ FObjectThumbnail* FUassetThumbnailLockModule::FindLockedThumbnail(UObject* Objec
 	return &LockedThumbnails.Add(Key, *DiskThumbnail);
 }
 
-bool FUassetThumbnailLockModule::AdoptCachedThumbnail(UObject* Object)
+bool FStickyThumbnailsModule::AdoptCachedThumbnail(UObject* Object)
 {
 	const FObjectThumbnail* CachedThumbnail = ThumbnailTools::FindCachedThumbnail(Object->GetFullName());
 	if (!CachedThumbnail || CachedThumbnail->IsEmpty())
@@ -323,7 +323,7 @@ bool FUassetThumbnailLockModule::AdoptCachedThumbnail(UObject* Object)
 	}
 
 	const FObjectThumbnail* LockedThumbnail = FindLockedThumbnail(Object);
-	if (LockedThumbnail && UassetThumbnailLock::AreThumbnailsEqual(*LockedThumbnail, *CachedThumbnail))
+	if (LockedThumbnail && StickyThumbnails::AreThumbnailsEqual(*LockedThumbnail, *CachedThumbnail))
 	{
 		return false;
 	}
@@ -332,7 +332,7 @@ bool FUassetThumbnailLockModule::AdoptCachedThumbnail(UObject* Object)
 	return true;
 }
 
-void FUassetThumbnailLockModule::RestoreLockedThumbnail(UObject* Object)
+void FStickyThumbnailsModule::RestoreLockedThumbnail(UObject* Object)
 {
 	if (FObjectThumbnail* LockedThumbnail = FindLockedThumbnail(Object))
 	{
@@ -344,13 +344,13 @@ void FUassetThumbnailLockModule::RestoreLockedThumbnail(UObject* Object)
 	}
 }
 
-UThumbnailLockUserData* FUassetThumbnailLockModule::FindLockUserData(UObject* Object)
+UStickyThumbnailUserData* FStickyThumbnailsModule::FindLockUserData(UObject* Object)
 {
 	IInterface_AssetUserData* UserDataOwner = Cast<IInterface_AssetUserData>(Object);
-	return UserDataOwner ? Cast<UThumbnailLockUserData>(UserDataOwner->GetAssetUserDataOfClass(UThumbnailLockUserData::StaticClass())) : nullptr;
+	return UserDataOwner ? Cast<UStickyThumbnailUserData>(UserDataOwner->GetAssetUserDataOfClass(UStickyThumbnailUserData::StaticClass())) : nullptr;
 }
 
-void FUassetThumbnailLockModule::SetLockUserData(UObject* Object, bool bLocked)
+void FStickyThumbnailsModule::SetLockUserData(UObject* Object, bool bLocked)
 {
 	IInterface_AssetUserData* UserDataOwner = Cast<IInterface_AssetUserData>(Object);
 	if (!UserDataOwner)
@@ -360,22 +360,22 @@ void FUassetThumbnailLockModule::SetLockUserData(UObject* Object, bool bLocked)
 
 	if (!bLocked)
 	{
-		UserDataOwner->RemoveUserDataOfClass(UThumbnailLockUserData::StaticClass());
+		UserDataOwner->RemoveUserDataOfClass(UStickyThumbnailUserData::StaticClass());
 		return;
 	}
 
-	UThumbnailLockUserData* UserData = FindLockUserData(Object);
+	UStickyThumbnailUserData* UserData = FindLockUserData(Object);
 	if (!UserData)
 	{
-		UserData = NewObject<UThumbnailLockUserData>(Object);
+		UserData = NewObject<UStickyThumbnailUserData>(Object);
 		UserDataOwner->AddAssetUserData(UserData);
 	}
 	UserData->LockedAsset = FSoftObjectPath(Object);
 }
 
-void FUassetThumbnailLockModule::CopyLockFromDuplicateSource(UObject* Object)
+void FStickyThumbnailsModule::CopyLockFromDuplicateSource(UObject* Object)
 {
-	UThumbnailLockUserData* UserData = FindLockUserData(Object);
+	UStickyThumbnailUserData* UserData = FindLockUserData(Object);
 	if (!UserData || UserData->LockedAsset == FSoftObjectPath(Object))
 	{
 		return;
@@ -385,9 +385,9 @@ void FUassetThumbnailLockModule::CopyLockFromDuplicateSource(UObject* Object)
 	UObject* Source = UserData->LockedAsset.ResolveObject();
 	UserData->LockedAsset = FSoftObjectPath(Object);
 
-	if (UEditorAssetSubsystem* AssetSubsystem = UassetThumbnailLock::GetAssetSubsystem())
+	if (UEditorAssetSubsystem* AssetSubsystem = StickyThumbnails::GetAssetSubsystem())
 	{
-		AssetSubsystem->SetMetadataTag(Object, LockedTag, UassetThumbnailLock::LockedValue);
+		AssetSubsystem->SetMetadataTag(Object, LockedTag, StickyThumbnails::LockedValue);
 	}
 
 	if (Source && Source != Object)
@@ -402,10 +402,10 @@ void FUassetThumbnailLockModule::CopyLockFromDuplicateSource(UObject* Object)
 
 	Object->MarkPackageDirty();
 
-	UE_LOG(LogUassetThumbnailLock, Log, TEXT("Locked thumbnail of duplicate %s"), *Object->GetPathName());
+	UE_LOG(LogStickyThumbnails, Log, TEXT("Locked thumbnail of duplicate %s"), *Object->GetPathName());
 }
 
-void FUassetThumbnailLockModule::HandleObjectPreSave(UObject* Object, FObjectPreSaveContext SaveContext)
+void FStickyThumbnailsModule::HandleObjectPreSave(UObject* Object, FObjectPreSaveContext SaveContext)
 {
 	if (SaveContext.IsProceduralSave() || !Object || !Object->IsAsset() || !SupportsThumbnailLock(Object->GetClass()) || !IsThumbnailLocked(Object))
 	{
@@ -426,7 +426,7 @@ void FUassetThumbnailLockModule::HandleObjectPreSave(UObject* Object, FObjectPre
 	}
 }
 
-void FUassetThumbnailLockModule::HandlePackageSaved(const FString& PackageFilename, UPackage* Package, FObjectPostSaveContext SaveContext)
+void FStickyThumbnailsModule::HandlePackageSaved(const FString& PackageFilename, UPackage* Package, FObjectPostSaveContext SaveContext)
 {
 	if (SaveContext.IsProceduralSave() || !Package)
 	{
@@ -444,7 +444,7 @@ void FUassetThumbnailLockModule::HandlePackageSaved(const FString& PackageFilena
 	ScheduleDeferredWork();
 }
 
-void FUassetThumbnailLockModule::HandleObjectPropertyChanged(UObject* Object, FPropertyChangedEvent& PropertyChangedEvent)
+void FStickyThumbnailsModule::HandleObjectPropertyChanged(UObject* Object, FPropertyChangedEvent& PropertyChangedEvent)
 {
 	// Capture / Clear Thumbnail cache the new (or empty) image then call PostEditChange on the asset: check for it next tick
 	if (Object && Object->IsAsset() && SupportsThumbnailLock(Object->GetClass()))
@@ -454,7 +454,7 @@ void FUassetThumbnailLockModule::HandleObjectPropertyChanged(UObject* Object, FP
 	}
 }
 
-void FUassetThumbnailLockModule::HandleInMemoryAssetCreated(UObject* Object)
+void FStickyThumbnailsModule::HandleInMemoryAssetCreated(UObject* Object)
 {
 	// Duplicates are reported here; their sub-objects are only final once duplication completes
 	if (Object && SupportsThumbnailLock(Object->GetClass()))
@@ -464,11 +464,11 @@ void FUassetThumbnailLockModule::HandleInMemoryAssetCreated(UObject* Object)
 	}
 }
 
-void FUassetThumbnailLockModule::HandleAssetRenamed(const FAssetData& AssetData, const FString& OldObjectPath)
+void FStickyThumbnailsModule::HandleAssetRenamed(const FAssetData& AssetData, const FString& OldObjectPath)
 {
 	if (UObject* Asset = AssetData.FastGetAsset(false))
 	{
-		if (UThumbnailLockUserData* UserData = FindLockUserData(Asset))
+		if (UStickyThumbnailUserData* UserData = FindLockUserData(Asset))
 		{
 			// Keep the marker pointing at its owner, otherwise the asset would be taken for a duplicate
 			UserData->LockedAsset = FSoftObjectPath(Asset);
@@ -476,15 +476,15 @@ void FUassetThumbnailLockModule::HandleAssetRenamed(const FAssetData& AssetData,
 	}
 }
 
-void FUassetThumbnailLockModule::ScheduleDeferredWork()
+void FStickyThumbnailsModule::ScheduleDeferredWork()
 {
 	if (!DeferredWorkHandle.IsValid())
 	{
-		DeferredWorkHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateRaw(this, &FUassetThumbnailLockModule::ProcessDeferredWork));
+		DeferredWorkHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateRaw(this, &FStickyThumbnailsModule::ProcessDeferredWork));
 	}
 }
 
-bool FUassetThumbnailLockModule::ProcessDeferredWork(float DeltaTime)
+bool FStickyThumbnailsModule::ProcessDeferredWork(float DeltaTime)
 {
 	DeferredWorkHandle.Reset();
 
@@ -529,7 +529,7 @@ bool FUassetThumbnailLockModule::ProcessDeferredWork(float DeltaTime)
 		else if (AdoptCachedThumbnail(Object))
 		{
 			SetLockUserData(Object, true);
-			UE_LOG(LogUassetThumbnailLock, Log, TEXT("Captured thumbnail kept as the locked thumbnail of %s"), *Object->GetPathName());
+			UE_LOG(LogStickyThumbnails, Log, TEXT("Captured thumbnail kept as the locked thumbnail of %s"), *Object->GetPathName());
 		}
 	}
 
@@ -538,4 +538,4 @@ bool FUassetThumbnailLockModule::ProcessDeferredWork(float DeltaTime)
 
 #undef LOCTEXT_NAMESPACE
 
-IMPLEMENT_MODULE(FUassetThumbnailLockModule, UassetThumbnailLock)
+IMPLEMENT_MODULE(FStickyThumbnailsModule, StickyThumbnails)

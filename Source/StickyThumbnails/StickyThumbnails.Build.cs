@@ -1,8 +1,8 @@
 using UnrealBuildTool;
 
-public class UassetThumbnailLock : ModuleRules
+public class StickyThumbnails : ModuleRules
 {
-	public UassetThumbnailLock(ReadOnlyTargetRules Target) : base(Target)
+	public StickyThumbnails(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 

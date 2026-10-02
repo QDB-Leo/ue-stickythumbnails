@@ -4,7 +4,7 @@
 #include "Engine/AssetUserData.h"
 #include "UObject/SoftObjectPath.h"
 
-#include "ThumbnailLockUserData.generated.h"
+#include "StickyThumbnailUserData.generated.h"
 
 /**
  * Marker added to assets whose thumbnail is locked.
@@ -12,7 +12,7 @@
  * which lets the duplicate inherit the lock and the locked thumbnail of its source.
  */
 UCLASS()
-class UThumbnailLockUserData : public UAssetUserData
+class UStickyThumbnailUserData : public UAssetUserData
 {
 	GENERATED_BODY()
 

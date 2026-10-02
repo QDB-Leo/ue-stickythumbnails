@@ -8,7 +8,7 @@
 
 class FObjectPostSaveContext;
 class FObjectPreSaveContext;
-class UThumbnailLockUserData;
+class UStickyThumbnailUserData;
 struct FAssetData;
 struct FPropertyChangedEvent;
 struct FToolMenuSection;
@@ -21,7 +21,7 @@ struct FToolMenuSection;
  * While an asset is locked, the thumbnail written on save is replaced by the one it had when it was locked,
  * or by the last one captured manually (Capture Thumbnail). Clear Thumbnail unlocks the asset.
  */
-class FUassetThumbnailLockModule : public IModuleInterface
+class FStickyThumbnailsModule : public IModuleInterface
 {
 public:
 	virtual void StartupModule() override;
@@ -61,7 +61,7 @@ private:
 	void RestoreLockedThumbnail(UObject* Object);
 
 	void CopyLockFromDuplicateSource(UObject* Object);
-	static UThumbnailLockUserData* FindLockUserData(UObject* Object);
+	static UStickyThumbnailUserData* FindLockUserData(UObject* Object);
 	static void SetLockUserData(UObject* Object, bool bLocked);
 
 	void ScheduleDeferredWork();
