@@ -34,7 +34,9 @@ Multi-selection is supported. Duplicating a locked asset gives a locked duplicat
 ```
 UassetThumbnailLock.uplugin
 Source/UassetThumbnailLock/   Editor module (C++)
-Content/                      Plugin content
-Config/                       Plugin config
-Resources/                    Icon128.png, etc.
 ```
+
+## Binaries
+
+Compiled binaries (`Binaries/`, `Intermediate/`) are not versioned. The plugin is built with the project:
+open the project (the editor offers to compile it) or build the project's Editor target from the IDE.
